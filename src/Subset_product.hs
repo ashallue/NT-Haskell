@@ -1,23 +1,117 @@
 module Subset_product where
 
--- algorithms for subset-product problem
+-- **************** algorithms for subset-product problem ************
 
 -- Let's start with a trivial enumeration algorithm
--- First input paramete is the modulus n, second is list of distinct primes
--- output is a subset which products to a mod n
+-- First input parameter is the modulus n, second target residue a, 
+-- third is list of distinct primes
+-- output is all subsets which product to a mod n
 
-trivial_sp :: Integer -> Integer -> [Integer] -> [Integer]
+trivial_sp :: Integer -> Integer -> [Integer] -> [[Integer]]
 -- if the list of primes is empty, no subset will satisfy
 trivial_sp n a [] = []
 
-trivial_sp n a (p:ps) = undefined
+-- filter by a function which computes the modular product, compares to a
+trivial_sp n a primes = 
+  let subset_lst = enumerate_ss primes
+  in filter (\lst -> mod_prod n lst == a) subset_lst
+
+
+{- Next we'll do a standard birthday algorithm, sqr root time-space tradeoff
+   Break the list in two, enumerate all subsets of one half, sort, then search 
+
+   To split the list, do splitAt (length lst `div` 2) lst.  Returns a pair, so use fst, snd
+-}
+
+twoset_sp :: Integer -> Integer -> [Integer] -> [ModSubset]
+twoset_sp n a [] = []
+twoset_sp n a primelst = 
+  let splitlst  = splitAt (length primelst `div` 2) primelst
+      front_ss  = mod_quicksort $ enumerate_modss (fst splitlst) n
+      back_ss   = enumerate_modss (snd splitlst) n
+  in back_ss
+
+
+-- *************** Helper functions ***************** --
+
+-- A datatype that pairs a subset with its subset product
+data ModSubset = 
+  ModSubset { subset :: [Integer]
+            , modulus :: Integer
+            , product :: Integer
+            } deriving (Show)
+
+-- Add a new number to the subset and update the product
+add_num :: Integer -> ModSubset -> ModSubset
+add_num p (ModSubset s m prod) = 
+  ModSubset (p:s) m (p * prod `rem` m)
 
 -- enumerate all subsets.  Assuming input list is made up of distinct primes
 enumerate_ss :: [Integer] -> [[Integer]]
 enumerate_ss [] = [[]]
 enumerate_ss (p:ps) = 
-  -- we combine two lists.   First, all subsets of ps, generated through recurisve call
+  -- we combine two lists.   First, all subsets of ps, generated through recursive call
   -- second, that list multiplied by the first prime
   let sub_lst = enumerate_ss ps
       mult_sub_lst = map ((:) p) sub_lst
   in sub_lst ++ mult_sub_lst
+
+-- product a list of integers and return that product modulo n
+mod_prod :: Integer -> [Integer] -> Integer
+
+-- using fold, continually multiply and reduce mod n, starting with 1 as the initial product
+mod_prod n lst = foldl (\x y -> rem (x * y) n) 1 lst
+
+-- enumerate all subsets, store them as instances of ModSubset.  Second parameter is modulus
+enumerate_modss :: [Integer] -> Integer -> [ModSubset]
+
+-- first base case: if list empty, return empty
+enumerate_modss []     n = []
+-- second base case: if single elt, return the two corresponding subsets
+enumerate_modss (p:[]) n = [ModSubset [p] n (rem p n), ModSubset [] n 1]
+-- for recursive call, create two lists and combine them
+enumerate_modss (p:ps) n = 
+  let sub_lst      = enumerate_modss ps n
+      mult_sub_lst = map (add_num p) sub_lst
+  in sub_lst ++ mult_sub_lst
+
+-- sort a list of type [ModSubset].  Sort by the product
+mod_quicksort :: [ModSubset] -> [ModSubset]
+
+-- if empty there is nothing to sort
+mod_quicksort [] = []
+-- if one element, simply return the same list
+mod_quicksort (s:[]) = (s:[])
+-- if more than one, first break into two lists and sort each
+mod_quicksort lst = 
+  let splitlst = splitAt (length lst `div` 2) lst
+      front    = mod_quicksort $ fst splitlst
+      back     = mod_quicksort $ snd splitlst
+  -- then merge the two sorted lists
+  in merge front back
+     -- define the merge function
+     where merge :: [ModSubset] -> [ModSubset] -> [ModSubset]
+           merge [] lst2 = lst2
+           merge lst1 [] = lst1
+           -- now we know both lists are nonempty.  Compare front elements and recurse
+           merge (ModSubset s1 n1 prod1:ss) (ModSubset s2 n2 prod2:ts)
+              |  prod1 <= prod2 = ModSubset s1 n1 prod1 : (merge ss (ModSubset s2 n2 prod2:ts))
+              |  otherwise      = ModSubset s2 n2 prod2 : (merge (ModSubset s1 n1 prod1:ss) ts) 
+
+
+-- search a list of type [ModSubset] for a particular product.  The list must be sorted by product.
+mod_quicksearch :: [ModSubset] -> Integer -> ModSubset
+
+-- if list is empty, return the empty ModSubset
+mod_quicksearch [] a = ModSubset [] 2 1
+
+-- otherwise, find the middle of the list, compare, and keep searching
+mod_quicksearch lst a 
+  | a == midvalue = head back
+  | a < midvalue  = mod_quicksearch front a
+  | otherwise     = mod_quicksearch back a
+  where splitlst = splitAt (length lst `div` 2) lst
+        front    = fst splitlst
+        back     = snd splitlst
+        midvalue = Subset_product.product (head back)
+   
