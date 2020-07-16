@@ -7,6 +7,7 @@ import Formatting.Clock
 import System.Clock
 import Formatting.Internal
 import System.IO
+import Debug.Trace
 
 {- Andrew Shallue, Summer 2020, a project to implement and time number theory functions 
 
@@ -17,6 +18,9 @@ https://chrisdone.com/posts/measuring-duration-in-haskell/
 
 main :: IO ()
 main = do
+  print(square_all [1, 2, 3, 4])
+
+  {-
   putStrLn "Hello World"
 
   print(enumerate_ss [2, 3, 5, 7])
@@ -36,5 +40,11 @@ main = do
   putStrLn " "
   print(mod_quicksearch sorted 8) 
   
+  -}
 
 
+-- test function for trace
+square_all :: [Integer] -> [Integer]
+square_all [] = []
+square_all (x:xs) = 
+  traceShow x $ (x*x) : square_all xs

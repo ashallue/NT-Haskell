@@ -1,5 +1,8 @@
 module Subset_product where
 
+import Basic_functions
+import Debug.Trace
+
 -- **************** algorithms for subset-product problem ************
 
 -- Let's start with a trivial enumeration algorithm
@@ -23,13 +26,26 @@ trivial_sp n a primes =
    To split the list, do splitAt (length lst `div` 2) lst.  Returns a pair, so use fst, snd
 -}
 
+
 twoset_sp :: Integer -> Integer -> [Integer] -> [ModSubset]
 twoset_sp n a [] = []
 twoset_sp n a primelst = 
   let splitlst  = splitAt (length primelst `div` 2) primelst
       front_ss  = mod_quicksort $ enumerate_modss (fst splitlst) n
       back_ss   = enumerate_modss (snd splitlst) n
-  in back_ss
+  in aux front_ss back_ss []
+     
+     -- action will take place in this function. First list is sorted, second is not
+     -- third parameter will be built up of Subsets that product to a, then returned
+     where aux :: [ModSubset] -> [ModSubset] -> [ModSubset] -> [ModSubset]
+           --trace ("inside aux with list " ++ show lst1) (aux sorted_lst lst1 lst2)
+           aux sorted_lst [] sol_lst = sol_lst
+           aux sorted_lst (s:ss) sol_lst 
+             -- check if a * b^-1 is in sorted list.  If a * b^-1 = c, then a = bc
+             | (subset found_ss) /= [] = aux sorted_lst ss (solution : sol_lst)
+             | otherwise               = aux sorted_lst ss sol_lst
+             where found_ss = mod_quicksearch sorted_lst (a * (mod_inverse (Subset_product.product s) n))
+                   solution = combine s found_ss
 
 
 -- *************** Helper functions ***************** --
@@ -45,6 +61,15 @@ data ModSubset =
 add_num :: Integer -> ModSubset -> ModSubset
 add_num p (ModSubset s m prod) = 
   ModSubset (p:s) m (p * prod `rem` m)
+
+add_num' :: ModSubset -> Integer -> ModSubset
+add_num' (ModSubset s m prod) p =
+  ModSubset (p:s) m (p * prod `rem` m)
+
+-- append subsets (assume distinct), multiply products, keep n the same
+combine :: ModSubset -> ModSubset -> ModSubset
+combine (ModSubset s1 n1 prod1) (ModSubset s2 n2 prod2) = 
+  ModSubset (s1 ++ s2) n1 (prod1 * prod2 `rem` n1)
 
 -- enumerate all subsets.  Assuming input list is made up of distinct primes
 enumerate_ss :: [Integer] -> [[Integer]]
@@ -100,6 +125,7 @@ mod_quicksort lst =
 
 
 -- search a list of type [ModSubset] for a particular product.  The list must be sorted by product.
+-- This function only returns one such solution if found.  There could be others not returned.
 mod_quicksearch :: [ModSubset] -> Integer -> ModSubset
 
 -- if list is empty, return the empty ModSubset
